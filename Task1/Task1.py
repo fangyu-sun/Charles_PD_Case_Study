@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 import pyreadstat
 import re
+import os
 
 
 def clean_and_format_data(df):
@@ -112,7 +113,7 @@ def remove_invalid_cases(df):
     # Check logic error1: selected Q1_99, but answered Q2-Q5.
     if existing_q2_q5_columns:
         logic_errors_q1 = q1_none_selected & df[existing_q2_q5_columns].notna().any(axis=1)
-        print(f"Wrong logic error1:selected Q1_99,but answered Q2-Q5: {logic_errors_q1.sum()}条")
+        print(f"Wrong logic error1:selected Q1_99,but answered Q2-Q5: {logic_errors_q1.sum()}records")
 
         # Show those ID for checking
         if logic_errors_q1.sum() > 0:
@@ -144,7 +145,7 @@ def remove_invalid_cases(df):
 
             # Non-Origin users who answered Q3–Q5 and did not select Q1_99
             logic_errors = ~origin_main_provider & has_q3_q5_data & ~q1_none_selected
-            print(f"Number of logic error records (non-Origin users answered Q3–Q5): {logic_errors.sum()}条")
+            print(f"Number of logic error records (non-Origin users answered Q3–Q5): {logic_errors.sum()}records")
 
             # Display IDs of these records for inspection
             if logic_errors.sum() > 0:
@@ -161,7 +162,7 @@ def remove_invalid_cases(df):
         has_q7_data = df['Where did you see or hear advertising for \'Origin\'?'].notna()
 
         logic_errors_q6 = q6_no_advertising & has_q7_data
-        print(f"Number of logic error3: {logic_errors_q6.sum()}条")
+        print(f"Number of logic error3: {logic_errors_q6.sum()}records")
         # Use .loc to avoid warnings
         df = df.loc[~logic_errors_q6].reset_index(drop=True)
 
@@ -648,8 +649,26 @@ def save_to_spss(df, variable_labels, value_labels, output_path):
 
 
 def main():
+    """
+    Main execution for Task 1
+    Automatically detects file paths relative to current script.
+    """
+
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    # 构建输入和输出路径
+    input_path = os.path.join(BASE_DIR, "..", "EXAMPLE DATA FILE.xlsx")          # 原始数据在上一级目录
+    output_sav_path = os.path.join(BASE_DIR, "cleaned_data.sav")                 # 输出SPSS文件
+    output_check_path = os.path.join(BASE_DIR, "cleaned_data_check.xlsx")        # 输出Excel检查文件
+
+    print("📂 Input file path:", input_path)
+    print("💾 Output SAV path:", output_sav_path)
+    print("💾 Output Excel check path:", output_check_path)
+
+
     # Read raw data
-    df = pd.read_excel('/Users/sunfangyu/Desktop/NY10102940/EXAMPLE DATA FILE.xlsx') 
+    df = pd.read_excel(input_path)
 
     # Clean column names and remove leading/trailing spaces and replace non-standard quotes
     df.columns = df.columns.str.strip().str.replace('‘', "'").str.replace('’', "'")
@@ -659,13 +678,8 @@ def main():
 
    
     # Export to SPSS file (.sav)
-    save_to_spss(
-        df_clean,
-        variable_labels,
-        value_labels,
-        '/Users/sunfangyu/Desktop/NY10102940/cleaned_data.sav'
-    )
-    print("✅ SAV file successfully saved: /Users/sunfangyu/Desktop/NY10102940/cleaned_data.sav")
+    save_to_spss(df_clean, variable_labels, value_labels, output_sav_path)
+    print(f"✅ SAV file successfully saved: {output_sav_path}")
 
     
     # Display the ratio of Origin users vs. non-Origin users
@@ -684,7 +698,8 @@ def main():
             print(f"  {col}: {non_empty_count} non-empty values")
 
     # Save processed Excel file for manual inspection
-    df_clean.to_excel('/Users/sunfangyu/Desktop/NY10102940/cleaned_data_check.xlsx', index=False) 
+    df_clean.to_excel(output_check_path, index=False)
+    print(f"✅ Excel check file saved: {output_check_path}")
 
 
 if __name__ == "__main__":
