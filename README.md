@@ -6,20 +6,20 @@ This repository contains the full Painted Dog Case Study completed by **Charles 
 ---
 
 ## Task 1 – Data Cleaning & Formatting
-**Objective:** Clean and format raw survey data for SPSS/Q import.
+   **Objective:** Clean and format raw survey data for SPSS/Q import.
 
-**Key Steps**
-- Removed invalid or inconsistent responses (e.g., under-18 respondents, skip-logic violations).  
-- Processed multi-response questions using one-hot encoding.  
-- Converted text labels to numeric codes according to the QNA codeframe.  
-- Generated a weekly “Wave” variable based on completion date.  
-- Applied variable and value labels for SPSS export using `pyreadstat`.  
-- Automated file-path detection for cross-system compatibility.
-
-**Deliverables**
-- `Task1/Task1.py` – Python cleaning script  
-- `Task1/cleaned_data.sav` – SPSS-ready dataset  
-- `Task1/cleaned_data_check.xlsx` – QA file for verification  
+   **Key Steps**
+      - Removed invalid or inconsistent responses (e.g., under-18 respondents, skip-logic violations).  
+      - Processed multi-response questions using one-hot encoding.  
+      - Converted text labels to numeric codes according to the QNA codeframe.  
+      - Generated a weekly “Wave” variable based on completion date.  
+      - Applied variable and value labels for SPSS export using `pyreadstat`.  
+      - Automated file-path detection for cross-system compatibility.
+   
+   **Deliverables**
+      - `Task1/Task1.py` – Python cleaning script  
+      - `Task1/cleaned_data.sav` – SPSS-ready dataset  
+      - `Task1/cleaned_data_check.xlsx` – QA file for verification  
 
 ---
 
@@ -62,3 +62,4 @@ This repository contains the full Painted Dog Case Study completed by **Charles 
         │ ├── Task2 Data visualisation.twbx
         │ ├── processed_data.csv
         └── README.md
+<img width="451" height="700" alt="image" src="https://github.com/user-attachments/assets/12db40d1-ca47-4366-9aae-a889fdb9f582" />
