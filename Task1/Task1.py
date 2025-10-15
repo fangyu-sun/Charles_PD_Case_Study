@@ -13,7 +13,7 @@ def clean_and_format_data(df):
     #  Create a copy of the dataset
     df_clean = df.copy()
 
-    # 1. Remove rows with logical erros or missing key data
+    # 1. Remove rows with logical errors or missing key data
     df_clean = remove_invalid_cases(df_clean)
 
     # 2. Process multi-response questions (one-hot encoding)
@@ -67,7 +67,7 @@ def apply_q1_99_skip_logic(df):
 
 def remove_invalid_cases(df):
     """
-    Remove invalid records – only delete those with genuine logic errors or critical missing data
+    Remove invalid records – delete those with logic errors and missing data
     """
 
     # Record original row count
@@ -87,12 +87,13 @@ def remove_invalid_cases(df):
     print(f"Number of records with missing key variables: {missing_key_data.sum()}")
     df = df[~missing_key_data].reset_index(drop=True)
 
-    # Remove records where age is "Under 18" (should terminate based on survey logic)
+    # Remove rows where age is "Under 18" (should terminate based on survey logic)
     under_18 = df['What is your age?'] == 'Under 18'
     print(f"Number of records where age is under 18:{under_18.sum()}")
     df = df[~under_18].reset_index(drop=True)
 
-    # Handle Q1_99 "None of these" skip logic first
+    # Logic Error 1: 
+    # Select participants who chose Q1_99 "None of these" (SKIP to Q6).
     q1_none_selected = df['Which of the following brands of electricity providers are you aware of?'].str.contains(
         'None of these', na=False, regex=False)
 
@@ -113,12 +114,12 @@ def remove_invalid_cases(df):
     # Check logic error1: selected Q1_99, but answered Q2-Q5.
     if existing_q2_q5_columns:
         logic_errors_q1 = q1_none_selected & df[existing_q2_q5_columns].notna().any(axis=1)
-        print(f"Wrong logic error1:selected Q1_99,but answered Q2-Q5: {logic_errors_q1.sum()}records")
+        print(f"Logic error1:selected Q1_99,but answered Q2-Q5: {logic_errors_q1.sum()}records")
 
-        # Show those ID for checking
+        # Show Logic1 Error ID for checking to delete
         if logic_errors_q1.sum() > 0:
             error_ids = df.loc[logic_errors_q1, 'ID'].tolist()
-            print(f"Wrong logic error1 ID: {error_ids}")
+            print(f"Logic error1 ID: {error_ids}")
 
         df = df.loc[~logic_errors_q1].reset_index(drop=True)
 
