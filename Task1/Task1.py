@@ -22,9 +22,6 @@ def clean_and_format_data(df):
     # 3. Convert text labels to numeric codes
     df_clean = convert_labels_to_codes(df_clean)
 
-    # 3.5 Apply skip logic for Q1_99 ("None of these").  (forget to add this logic ahahha)
-    df_clean = apply_q1_99_skip_logic(df_clean)
-
     # 4. Rename columns and reorder them according to questionnaire structure
     df_clean = rename_and_reorder_columns(df_clean)
 
@@ -139,7 +136,7 @@ def remove_invalid_cases(df):
                 print(f"Error4 ID: {error_ids}")
             
             # Use .loc to avoid warnings
-            df = df.loc[error4].reset_index(drop=True)
+            df = df.loc[~error4].reset_index(drop=True)
 
     #Error5
     # Check logic error5：Q6 answered "No" or "Don't know" but also answered Q7    if 'In the past 12 months, have you seen or heard any advertising for \'Origin\'?' in df.columns:
@@ -160,6 +157,31 @@ def remove_invalid_cases(df):
 
     final_count = len(df)
     print(f"Invalid record removal completed: {original_count} -> {final_count}")
+
+    return df
+
+
+def create_multiresponse_columns(df, column, options, question_code):
+    """
+    Create one-hot encoded columns for multi-response questions
+    """
+    # Create new binary columns
+    for label, code in options.items():
+        new_col_name = f"{question_code}_{code}"
+
+        if label == 'Other (please specify)':
+            # "Others" option requires checking a separate column
+            other_col = f"{column} (Other (please specify))"
+            if other_col in df.columns:
+                df[new_col_name] = df[other_col].notna().astype(int)
+            else:
+                df[new_col_name] = 0
+        elif label == 'None of these':
+            # Check if "None of these" is included (use regex for matching
+            df[new_col_name] = df[column].str.contains(re.escape('None of these'), na=False).astype(int)
+        else:
+            # Check if the brand is included (use regex for matching)
+            df[new_col_name] = df[column].str.contains(re.escape(label), na=False, regex=False).astype(int)
 
     return df
 
@@ -198,31 +220,6 @@ def process_multiresponse_questions(df):
     # Process Q7 multi-response
     q7_col = 'Where did you see or hear advertising for \'Origin\'?'
     df = create_multiresponse_columns(df, q7_col, q7_options, 'Q7')
-
-    return df
-
-
-def create_multiresponse_columns(df, column, options, question_code):
-    """
-    Create one-hot encoded columns for multi-response questions
-    """
-    # Create new binary columns
-    for label, code in options.items():
-        new_col_name = f"{question_code}_{code}"
-
-        if label == 'Other (please specify)':
-            # "Others" option requires checking a separate column
-            other_col = f"{column} (Other (please specify))"
-            if other_col in df.columns:
-                df[new_col_name] = df[other_col].notna().astype(int)
-            else:
-                df[new_col_name] = 0
-        elif label == 'None of these':
-            # Check if "None of these" is included (use regex for matching
-            df[new_col_name] = df[column].str.contains(re.escape('None of these'), na=False).astype(int)
-        else:
-            # Check if the brand is included (use regex for matching)
-            df[new_col_name] = df[column].str.contains(re.escape(label), na=False, regex=False).astype(int)
 
     return df
 
@@ -362,35 +359,6 @@ def convert_labels_to_codes(df):
         'Which of the following best describes your household structure?'].map(household_mapping)
 
     return df
-
-
-def apply_q1_99_skip_logic(df):
-    """
-    Apply skip logic for Q1_99 (“None of these”)
-    """
-
-    # Identify respondents who selected Q1_99 ("None of these")
-    q1_99_selected = df['Q1_99'] == 1
-
-    print(f"Count of records where Q1 = 'None of these': {q1_99_selected.sum()}")
-
-    # Variables that should be skipped (set to NaN)
-    skip_columns = ['Q2', 'Q3', 'Q4a', 'Q4b', 'Q5_1', 'Q5_2', 'Q5_3', 'Q5_4']
-
-    # Only include columns that exist in the dataset
-    existing_skip_columns = [col for col in skip_columns if col in df.columns]
-
-    # For respondents with Q1_99=1, set Q2–Q5 values to NaN
-    for col in existing_skip_columns:
-        df.loc[q1_99_selected, col] = np.nan
-
-    # Verify that columns were properly blanked out
-    for col in existing_skip_columns:
-        null_count = df.loc[q1_99_selected, col].isna().sum()
-        print(f"Number of null values in column {col} among Q1_99 records: {null_count}/{q1_99_selected.sum()}")
-
-    return df
-
 
 
 def rename_and_reorder_columns(df):
@@ -681,7 +649,7 @@ def main():
     # Constructing Input and Output Paths
     input_path = os.path.join(BASE_DIR, "..", "EXAMPLE DATA FILE.xlsx")          # Path to the raw data file (one level above)
     output_sav_path = os.path.join(BASE_DIR, "cleaned_data.sav")                 # Output path for the .sav file
-    output_check_path = os.path.join(BASE_DIR, "cleaned_data_check.xlsx")        # 输出Excel检查文件
+    output_check_path = os.path.join(BASE_DIR, "cleaned_data_check.xlsx")        # Output path for the Excel file for manual inspection
 
     print("📂 Input file path:", input_path)
     print("💾 Output SAV path:", output_sav_path)
