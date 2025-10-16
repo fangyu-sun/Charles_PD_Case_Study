@@ -37,34 +37,6 @@ def clean_and_format_data(df):
     return df_clean, variable_labels, value_labels
 
 
-def apply_q1_99_skip_logic(df):
-    """
-    Apply skip logic for Q1_99 (“None of these”)
-    """
-
-    # Identify respondents who selected Q1_99 ("None of these")
-    q1_99_selected = df['Q1_99'] == 1
-
-    print(f"Count of records where Q1 = 'None of these': {q1_99_selected.sum()}")
-
-    # Variables that should be skipped (set to NaN)
-    skip_columns = ['Q2', 'Q3', 'Q4a', 'Q4b', 'Q5_1', 'Q5_2', 'Q5_3', 'Q5_4']
-
-    # Only include columns that exist in the dataset
-    existing_skip_columns = [col for col in skip_columns if col in df.columns]
-
-    # For respondents with Q1_99=1, set Q2–Q5 values to NaN
-    for col in existing_skip_columns:
-        df.loc[q1_99_selected, col] = np.nan
-
-    # Verify that columns were properly blanked out
-    for col in existing_skip_columns:
-        null_count = df.loc[q1_99_selected, col].isna().sum()
-        print(f"Number of null values in column {col} among Q1_99 records: {null_count}/{q1_99_selected.sum()}")
-
-    return df
-
-
 def remove_invalid_cases(df):
     """
     Remove invalid records – delete those with logic errors and missing data
@@ -82,17 +54,29 @@ def remove_invalid_cases(df):
     # Key variables: Gender, Age, Postcode, CompletedDate
     key_columns = ['What is your gender?', 'What is your age?', 'What is your postcode?', 'CompletedDate']
 
+    # Error1
     # Remove rows with missing key variables
-    missing_key_data = df[key_columns].isna().any(axis=1)
-    print(f"Number of records with missing key variables: {missing_key_data.sum()}")
-    df = df[~missing_key_data].reset_index(drop=True)
+    error1 = df[key_columns].isna().any(axis=1)
+    print(f"Error1: Number of records with missing key variables: {error1.sum()}")
+    df = df[~error1].reset_index(drop=True)
+    
+    # Display IDs of these records for inspection
+    if error1.sum() > 0:
+        error_ids = df.loc[error1, 'ID'].tolist()
+        print(f"Error1 ID: {error_ids}")
 
+    # Error2
     # Remove rows where age is "Under 18" (should terminate based on survey logic)
-    under_18 = df['What is your age?'] == 'Under 18'
-    print(f"Number of records where age is under 18:{under_18.sum()}")
-    df = df[~under_18].reset_index(drop=True)
+    error2 = df['What is your age?'] == 'Under 18'
+    print(f"Error2: Number of records where age is under 18:{error2.sum()}")
+    df = df[~error2].reset_index(drop=True)
 
-    # Logic Error 1: 
+    # Display IDs of these records for inspection
+    if error2.sum() > 0:
+        error_ids = df.loc[error2, 'ID'].tolist()
+        print(f"Error2 ID: {error_ids}")
+
+    # Error3: 
     # Select participants who chose Q1_99 "None of these" (SKIP to Q6).
     q1_none_selected = df['Which of the following brands of electricity providers are you aware of?'].str.contains(
         'None of these', na=False, regex=False)
@@ -111,19 +95,20 @@ def remove_invalid_cases(df):
     # Only keep the columns exist
     existing_q2_q5_columns = [col for col in q2_q5_columns if col in df.columns]
 
-    # Check logic error1: selected Q1_99, but answered Q2-Q5.
+    # Check logic Error3: selected Q1_99, but answered Q2-Q5.
     if existing_q2_q5_columns:
-        logic_errors_q1 = q1_none_selected & df[existing_q2_q5_columns].notna().any(axis=1)
-        print(f"Logic error1:selected Q1_99,but answered Q2-Q5: {logic_errors_q1.sum()}records")
+        error3 = q1_none_selected & df[existing_q2_q5_columns].notna().any(axis=1)
+        print(f"Error3: Number of selected Q1_99,but answered Q2-Q5: {error3.sum()}records")
 
         # Show Logic1 Error ID for checking to delete
-        if logic_errors_q1.sum() > 0:
-            error_ids = df.loc[logic_errors_q1, 'ID'].tolist()
-            print(f"Logic error1 ID: {error_ids}")
+        if error3.sum() > 0:
+            error_ids = df.loc[error3, 'ID'].tolist()
+            print(f"Error3 ID: {error_ids}")
 
-        df = df.loc[~logic_errors_q1].reset_index(drop=True)
+        df = df.loc[~error3].reset_index(drop=True)
 
-    # Check logic error2：Not Origin user,but answered Q3-Q5
+    # Error4
+    # Check logic error4：Not Origin user,but answered Q3-Q5
     if 'And which ONE of these brands is your main provider?' in df.columns:
         origin_main_provider = df['And which ONE of these brands is your main provider?'] == 'Origin'
 
@@ -145,27 +130,33 @@ def remove_invalid_cases(df):
             has_q3_q5_data = df[existing_q3_q5_columns].notna().any(axis=1)
 
             # Non-Origin users who answered Q3–Q5 and did not select Q1_99
-            logic_errors = ~origin_main_provider & has_q3_q5_data & ~q1_none_selected
-            print(f"Number of logic error records (non-Origin users answered Q3–Q5): {logic_errors.sum()}records")
-
+            error4 = ~origin_main_provider & has_q3_q5_data & ~q1_none_selected
+            print(f"Error4: Number of (non-Origin users answered Q3–Q5)records: {error4.sum()}records")
+ 
             # Display IDs of these records for inspection
-            if logic_errors.sum() > 0:
-                error_ids = df.loc[logic_errors, 'ID'].tolist()
-                print(f"IDs of logic error records: {error_ids}")
-
+            if error4.sum() > 0:
+                error_ids = df.loc[error4, 'ID'].tolist()
+                print(f"Error4 ID: {error_ids}")
+            
             # Use .loc to avoid warnings
-            df = df.loc[~logic_errors].reset_index(drop=True)
+            df = df.loc[error4].reset_index(drop=True)
 
-    #Check logic error3：Q6 answered "No" or "Don't know" but also answered Q7
+    #Error5
+    # Check logic error5：Q6 answered "No" or "Don't know" but also answered Q7    if 'In the past 12 months, have you seen or heard any advertising for \'Origin\'?' in df.columns:
     if 'In the past 12 months, have you seen or heard any advertising for \'Origin\'?' in df.columns:
         q6_no_advertising = df['In the past 12 months, have you seen or heard any advertising for \'Origin\'?'].isin(
             ['No', 'Don\'t know'])
         has_q7_data = df['Where did you see or hear advertising for \'Origin\'?'].notna()
 
-        logic_errors_q6 = q6_no_advertising & has_q7_data
-        print(f"Number of logic error3: {logic_errors_q6.sum()}records")
+        error5 = q6_no_advertising & has_q7_data
+        print(f"Error5: Number of (Q6 answered \"No\" or \"Don't know\" but also answered Q7)records: {error5.sum()}records")
         # Use .loc to avoid warnings
-        df = df.loc[~logic_errors_q6].reset_index(drop=True)
+        df = df.loc[~error5].reset_index(drop=True)
+
+        # Display IDs of these records for inspection
+        if error5.sum() > 0:
+            error_ids = df.loc[error5, 'ID'].tolist()
+            print(f"Error5 ID: {error_ids}")
 
     final_count = len(df)
     print(f"Invalid record removal completed: {original_count} -> {final_count}")
@@ -371,6 +362,35 @@ def convert_labels_to_codes(df):
         'Which of the following best describes your household structure?'].map(household_mapping)
 
     return df
+
+
+def apply_q1_99_skip_logic(df):
+    """
+    Apply skip logic for Q1_99 (“None of these”)
+    """
+
+    # Identify respondents who selected Q1_99 ("None of these")
+    q1_99_selected = df['Q1_99'] == 1
+
+    print(f"Count of records where Q1 = 'None of these': {q1_99_selected.sum()}")
+
+    # Variables that should be skipped (set to NaN)
+    skip_columns = ['Q2', 'Q3', 'Q4a', 'Q4b', 'Q5_1', 'Q5_2', 'Q5_3', 'Q5_4']
+
+    # Only include columns that exist in the dataset
+    existing_skip_columns = [col for col in skip_columns if col in df.columns]
+
+    # For respondents with Q1_99=1, set Q2–Q5 values to NaN
+    for col in existing_skip_columns:
+        df.loc[q1_99_selected, col] = np.nan
+
+    # Verify that columns were properly blanked out
+    for col in existing_skip_columns:
+        null_count = df.loc[q1_99_selected, col].isna().sum()
+        print(f"Number of null values in column {col} among Q1_99 records: {null_count}/{q1_99_selected.sum()}")
+
+    return df
+
 
 
 def rename_and_reorder_columns(df):
@@ -658,9 +678,9 @@ def main():
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    # 构建输入和输出路径
-    input_path = os.path.join(BASE_DIR, "..", "EXAMPLE DATA FILE.xlsx")          # 原始数据在上一级目录
-    output_sav_path = os.path.join(BASE_DIR, "cleaned_data.sav")                 # 输出SPSS文件
+    # Constructing Input and Output Paths
+    input_path = os.path.join(BASE_DIR, "..", "EXAMPLE DATA FILE.xlsx")          # Path to the raw data file (one level above)
+    output_sav_path = os.path.join(BASE_DIR, "cleaned_data.sav")                 # Output path for the .sav file
     output_check_path = os.path.join(BASE_DIR, "cleaned_data_check.xlsx")        # 输出Excel检查文件
 
     print("📂 Input file path:", input_path)
