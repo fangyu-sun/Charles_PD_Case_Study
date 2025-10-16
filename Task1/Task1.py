@@ -163,25 +163,33 @@ def remove_invalid_cases(df):
 
 def create_multiresponse_columns(df, column, options, question_code):
     """
-    Create one-hot encoded columns for multi-response questions
+    Create one-hot encoded columns for multi-response questions (robust version)
+    Handles delimiters like ';', ',', or whitespace properly.
     """
-    # Create new binary columns
+
+    # Normalize delimiters and remove extra spaces
+    df[column] = df[column].astype(str)
+    df[column] = df[column].str.replace(',', ';', regex=False)
+    df[column] = df[column].str.replace('；', ';', regex=False) # Replace Chinese semicolons
+    df[column] = df[column].str.replace(r'\s*;\s*', ';', regex=True)  # Trim spaces around semicolons
+
     for label, code in options.items():
         new_col_name = f"{question_code}_{code}"
 
         if label == 'Other (please specify)':
-            # "Others" option requires checking a separate column
+            # Check whether the separate "Other" column exists
             other_col = f"{column} (Other (please specify))"
-            if other_col in df.columns:
-                df[new_col_name] = df[other_col].notna().astype(int)
-            else:
-                df[new_col_name] = 0
+            df[new_col_name] = df[other_col].notna().astype(int) if other_col in df.columns else 0
+
         elif label == 'None of these':
-            # Check if "None of these" is included (use regex for matching
-            df[new_col_name] = df[column].str.contains(re.escape('None of these'), na=False).astype(int)
+            # Identify rows containing "None of these" (case-insensitive)
+            df[new_col_name] = df[column].str.contains('None of these', case=False, na=False).astype(int)
+
         else:
-            # Check if the brand is included (use regex for matching)
-            df[new_col_name] = df[column].str.contains(re.escape(label), na=False, regex=False).astype(int)
+            # Match labels separated by semicolons or whitespace, ignoring case
+            df[new_col_name] = df[column].str.contains(
+                rf'(^|;|\s){re.escape(label)}($|;|\s)', case=False, na=False, regex=True
+            ).astype(int)
 
     return df
 
