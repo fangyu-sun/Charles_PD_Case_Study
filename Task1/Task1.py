@@ -55,13 +55,14 @@ def remove_invalid_cases(df):
     # Remove rows with missing key variables
     error1 = df[key_columns].isna().any(axis=1)
     print(f"Error1: Number of records with missing key variables: {error1.sum()}")
-    df = df[~error1].reset_index(drop=True)
+   
     
     # Display IDs of these records for inspection
     if error1.sum() > 0:
         error_ids = df.loc[error1, 'ID'].tolist()
         print(f"Error1 ID: {error_ids}")
-
+    df = df[~error1].reset_index(drop=True)
+    
     # Error2
     # Remove rows where age is "Under 18" (should terminate based on survey logic)
     error2 = df['What is your age?'] == 'Under 18'
@@ -72,6 +73,32 @@ def remove_invalid_cases(df):
     if error2.sum() > 0:
         error_ids = df.loc[error2, 'ID'].tolist()
         print(f"Error2 ID: {error_ids}")
+
+
+    # Error6: Q1 contains "None of these"(Q1_99) but also includes other brands
+    if 'Which of the following brands of electricity providers are you aware of?' in df.columns:
+        q1_col = 'Which of the following brands of electricity providers are you aware of?'
+
+        # Normalize delimiters for accurate text matching
+        df[q1_col] = df[q1_col].astype(str)
+        df[q1_col] = df[q1_col].str.replace(',', ';', regex=False)
+        df[q1_col] = df[q1_col].str.replace('；', ';', regex=False)
+        df[q1_col] = df[q1_col].str.replace(r'\s*;\s*', ';', regex=True)
+
+        # List all brand names (excluding "None of these")
+        brand_names = ['Synergy', 'Western Power', 'AGL', 'Origin', 'Horizon Power', 'Red Energy']
+
+        # Detect responses that contain "None of these" plus any other brand
+        contains_none = df[q1_col].str.contains('None of these', case=False, na=False)
+        contains_other = df[q1_col].str.contains('|'.join([re.escape(b) for b in brand_names]), case=False, na=False)
+        error6 = contains_none & contains_other
+
+        print(f"Error6: Number of records with 'None of these' plus other Q1 options: {error6.sum()} records")
+        if error6.sum() > 0:
+            error_ids = df.loc[error6, 'ID'].tolist()
+            print(f"Error6 ID: {error_ids}")
+
+        df = df.loc[~error6].reset_index(drop=True)    
 
     # Error3: 
     # Select participants who chose Q1_99 "None of these" (SKIP to Q6).
